@@ -1,4 +1,3 @@
-// bucket_search_u64.c
 #include "bucket_search_u64.h"
 
 #if defined(__GNUC__) || defined(__clang__)

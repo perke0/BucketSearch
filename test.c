@@ -1,8 +1,5 @@
-// bench_search.c
-// Benchmark: linear scan vs binary search vs libc bsearch vs interpolation search vs BucketSearch
-// Scenario: sorted uint64_t array, n=5,000,000, values in [1 .. 10 trillion] with skips.
+// Benchmark: binary search vs libc bsearch vs interpolation search vs BucketSearch
 // Queries: mix of hits/misses (configurable).
-//
 // Build (Linux/glibc):
 //   gcc -O3 -march=native -DNDEBUG bench_search.c -o bench_search
 // Run:
@@ -10,9 +7,7 @@
 //     n=5M, q=2M, K=16, hit%=50, seed=123
 //
 // Notes:
-// - Linear scan is included as a baseline (will be extremely slow at 5M).
 // - libc bsearch uses a comparator (function call overhead), often slower than inlined binary.
-// - Interpolation search can be great when data ~uniform; can be bad when skewed (but safe here).
 // - BucketSearch uses top-K bits of the *meaningful* width W (based on max value), then lower_bound in bucket.
 
 #include <stdint.h>
@@ -30,7 +25,6 @@
   #define UNLIKELY(x) (x)
 #endif
 
-// ---------------- timing ----------------
 
 static inline uint64_t ns_now(void) {
   struct timespec ts;
@@ -38,7 +32,6 @@ static inline uint64_t ns_now(void) {
   return (uint64_t)ts.tv_sec * 1000000000ull + (uint64_t)ts.tv_nsec;
 }
 
-// ---------------- rng ----------------
 
 typedef struct {
   uint64_t s;
@@ -51,10 +44,9 @@ static inline uint64_t splitmix64(rng64_t *r) {
   return x ^ (x >> 31);
 }
 
-// ---------------- data gen ----------------
-
 // Generate sorted, strictly increasing values with random gaps within [1..maxV].
 // Simple model: v += 1 + (rand % avg_gap*2).
+
 static void gen_sorted_sparse_u64(uint64_t *a, size_t n, uint64_t maxV, uint64_t avg_gap, uint64_t seed) {
   rng64_t r = { seed ? seed : 1ull };
   uint64_t v = 1;
@@ -95,10 +87,7 @@ static void gen_queries_u64(uint64_t *q, size_t qn,
   }
 }
 
-// ---------------- searches ----------------
 
-
-// Inlined binary search exact match. Returns index or -1.
 static inline ptrdiff_t binary_find_u64(const uint64_t *a, size_t n, uint64_t x) {
   size_t lo = 0, hi = n;
   while (lo < hi) {
@@ -111,7 +100,6 @@ static inline ptrdiff_t binary_find_u64(const uint64_t *a, size_t n, uint64_t x)
   return -1;
 }
 
-// libc bsearch comparator
 static int cmp_u64(const void *key, const void *elem) {
   uint64_t k = *(const uint64_t*)key;
   uint64_t e = *(const uint64_t*)elem;
@@ -124,7 +112,6 @@ static inline ptrdiff_t libc_bsearch_find_u64(const uint64_t *a, size_t n, uint6
   return (ptrdiff_t)(p - a);
 }
 
-// Interpolation search exact match (safe-ish for monotone, may degrade on skew).
 static inline ptrdiff_t interpolation_find_u64(const uint64_t *a, size_t n, uint64_t x) {
   if (n == 0) return -1;
   size_t lo = 0, hi = n - 1;
@@ -230,7 +217,7 @@ static inline ptrdiff_t bucketsearch_find_u64(const uint64_t *a, size_t n, uint3
   return -1;
 }
 
-// ---------------- benchmark harness ----------------
+// ------------- benchmark harness ----------------
 
 typedef ptrdiff_t (*find_fn)(const uint64_t*, size_t, uint64_t);
 
@@ -251,12 +238,11 @@ static uint64_t bench_find(const char *name, find_fn fn, const uint64_t *a, size
   return dt;
 }
 
-// Wrappers to match find_fn signature
 static ptrdiff_t w_binary(const uint64_t *a, size_t n, uint64_t x) { return binary_find_u64(a, n, x); }
 static ptrdiff_t w_libc_bsearch(const uint64_t *a, size_t n, uint64_t x) { return libc_bsearch_find_u64(a, n, x); }
 static ptrdiff_t w_interp(const uint64_t *a, size_t n, uint64_t x) { return interpolation_find_u64(a, n, x); }
 
-// BucketSearch wrapper uses globals for start/K (keeps call signature like bsearch(array,target))
+
 static const size_t *g_start = NULL;
 static uint32_t g_K = 16;
 static ptrdiff_t w_bucket(const uint64_t *a, size_t n, uint64_t x) {
@@ -310,8 +296,6 @@ int main(int argc, char **argv) {
   for (size_t i = 0; i < qn; i += (qn / 1024 + 1)) warm ^= q[i];
   printf("(warm=%llu)\n\n", (unsigned long long)warm);
 
-  // Benchmarks
-  // NOTE: linear scan is extremely slow for 5M; you can comment it out if needed.
   bench_find("Binary search",      w_binary,       a, n, q, qn);
   bench_find("libc bsearch",       w_libc_bsearch, a, n, q, qn);
   bench_find("Interpolation",      w_interp,       a, n, q, qn);
