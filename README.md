@@ -1,8 +1,8 @@
 # BucketSearch
 
-BucketSearch is a high‑performance search algorithm for **sorted arrays**, designed to outperform classic binary search by reducing branches and comparisons using fixed‑size buckets.
+BucketSearch is a high performance search algorithm for **sorted arrays**, designed to outperform classic binary search by reducing branches and comparisons using fixed size buckets.
 
-It is intended for performance‑critical code paths where millions of lookups are performed on large, mostly static datasets.
+It is intended for performance critical code paths where millions of lookups are performed on large, mostly static datasets.
 
 ---
 
